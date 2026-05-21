@@ -1,0 +1,9 @@
+# Python cache artifacts
+__pycache__/
+*.py[cod]
+
+# Local benchmark/cache data
+data/datasets/
+
+# Optional local runtime artifacts
+wandb/
