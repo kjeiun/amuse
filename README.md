@@ -15,13 +15,44 @@
   <img src="https://img.shields.io/badge/Python-3.10-blue.svg" alt="Python">
 </p>
 
-## Abstract
+## Method Overview
 
-- AMUSE combines the fast progress of Muon with the stability of Schedule-Free optimization using a time-varying Schedule-Free momentum.
+AMUSE combines Muon with Schedule-Free updates by maintaining three sequences:
+the fast base sequence $Z_t$, the averaged sequence $X_t$, and the gradient-evaluation
+point $Y_t$. At each step, AMUSE evaluates the gradient at
 
-- From a river-valley perspective, Muon accelerates progress along flat bulk directions but can amplify oscillations along high-curvature dominant directions. AMUSE gradually moves gradient evaluation from the fast Muon trajectory toward a stable averaged trajectory, reducing oscillations while preserving rapid early progress.
+$$
+Y_t = (1-\beta_t) Z_t + \beta_t X_t,
+$$
 
-- Across vision tasks and language model pretraining, AMUSE improves the performance-iteration Pareto frontier over AdamW, Schedule-Free AdamW, and Muon.
+where the interpolation coefficient increases after warmup as
+
+$$
+\beta_t =
+\begin{cases}
+\beta_1, & t \le T_0, \\
+1 - \left(\frac{T_0 - 1}{t - 1}\right)^\rho (1-\beta_1), & t > T_0.
+\end{cases}
+$$
+
+The parameter $\rho$ controls how quickly the gradient-evaluation point shifts from
+the fast Muon trajectory $Z_t$ toward the stable averaged trajectory $X_t$.
+
+For matrix-valued hidden parameters, AMUSE applies Muon at $Y_t$:
+
+$$
+M_t = \mu M_{t-1} + \nabla L(Y_t), \qquad
+O_t = \operatorname{NewtonSchulz}(M_t),
+$$
+
+$$
+Z_{t+1} = Z_t - \eta O_t,
+\qquad
+X_{t+1} = \left(1-\frac{1}{t+1}\right) X_t + \frac{1}{t+1} Z_{t+1}.
+$$
+
+Thus, AMUSE preserves Muon's rapid progress in early training while gradually
+stabilizing the trajectory through Schedule-Free averaging. This preserves Muon's rapid progress while reducing valley-wall oscillations, enabling schedule-free and anytime training.
 
 **Full paper abstract**:
 > Modern deep learning commonly relies on AdamW with prescribed learning rate schedules, but recent works challenge both components: Schedule-Free optimization removes explicit schedules via iterate averaging, and Muon improves the update geometry by orthogonalizing momentum for matrix parameters. Despite Muon's strong empirical performance, its underlying mechanism remains partially understood.
