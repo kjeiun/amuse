@@ -42,7 +42,7 @@ For matrix-valued hidden parameters, AMUSE applies Muon at $Y_t$:
 
 $$
 M_t = \mu M_{t-1} + \nabla L(Y_t), \qquad
-O_t = \operatorname{NewtonSchulz}(M_t),
+O_t = \mathrm{NewtonSchulz}(M_t),
 $$
 
 $$
