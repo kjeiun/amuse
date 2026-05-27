@@ -214,7 +214,6 @@ src/data/datasets/
 src/image/data/
 wandb/
 tb_logs/
-assets/
 exps/
 sf_muon_results/
 
