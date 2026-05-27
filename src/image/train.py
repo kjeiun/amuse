@@ -234,19 +234,19 @@ def main():
         head_params = [model.fc.weight]
         param_groups = [
             dict(
-                params=nonhidden_params + head_params,
-                use_muon=False,
-                update_type=args.amuse_aux_opt,
-                lr=args.sgd_learning_rate,
-                weight_decay=args.decay,
-            ),
-            dict(
                 params=hidden_weights,
                 use_muon=True,
                 aux_update_type=args.amuse_aux_opt,
                 lr=args.learning_rate,
                 weight_decay=args.decay,
                 momentum=args.momentum,
+            ),
+            dict(
+                params=nonhidden_params + head_params,
+                use_muon=False,
+                update_type=args.amuse_aux_opt,
+                lr=args.sgd_learning_rate,
+                weight_decay=args.decay,
             ),
         ]
         optimizer = AMUSE(

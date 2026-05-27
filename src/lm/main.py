@@ -276,7 +276,7 @@ def main(args, parser):
             weight_decay=args.weight_decay,
         )
         opt = AMUSE(
-            param_groups=[adam_groups, muon_group],
+            param_groups=[muon_group, adam_groups],
             weight_decay_at_y=args.weight_decay_at_y,
             beta1=args.beta1,
             warmup_steps=sf_warmup_steps,

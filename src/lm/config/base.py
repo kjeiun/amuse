@@ -133,7 +133,7 @@ def parse_args(base_parser, args, namespace):
     )  # default value is 1.0 in NanoGPT
     parser.add_argument(
         "--momentum",
-        default=0.9,
+        default=0.95,
         type=float,
         help=(
             "Momentum used by optimizers that consume args.momentum: "
