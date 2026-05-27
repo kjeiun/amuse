@@ -71,6 +71,7 @@ AMUSE follows the schedule-free style train/eval transition used in this codebas
 ## Notes
 
 - The AMUSE branch effectively expects `--scheduler none` so optimizer warmup is active.
+- `amuse` requires a positive warmup length in the optimizer implementation, so set `--warmup_steps > 0`.
 - For multi-GPU runs, adjust `CUDA_VISIBLE_DEVICES` and `--nproc_per_node` to match your machine.
 
 ## Codebase
