@@ -101,12 +101,7 @@ The same trend holds across model scales.
 AMUSE also performs strongly across standard image classification benchmarks.
 
 <p align="center">
-  <img src="assets/cifar_10_cifar100.png" width="720" alt="CIFAR-10 and CIFAR-100 image classification results">
-</p>
-
-
-<p align="center">
-  <img src="assets/svhn_imagenet.png" width="720" alt="SVHN and ImageNet image classification results">
+  <img src="assets/image_benchmark.png" width="720" alt="image classification results">
 </p>
 
 
