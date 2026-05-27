@@ -1,8 +1,56 @@
-# AMUSE
 
-This repository is based on the [epfml/llm-optimizer-benchmark](https://github.com/epfml/llm-optimizer-benchmark) codebase and adapts it for experiments with **AMUSE**.
+<h1 align="center">AMUSE</h1>
 
-## Setup
+<p align="center">
+  <strong>AMUSE: Anytime Muon with Stable Gradient Evaluation</strong>
+</p>
+
+<p align="center">
+  Jueun Kim* · Baekrok Shin* · Jihun Yun · Beomhan Baek · Minhak Song · Chulhee Yun
+</p>
+
+<p align="center">
+  <a href="https://arxiv.org/abs/2605.22432">
+    <img src="https://img.shields.io/badge/arXiv-2605.22432-b31b1b.svg" alt="arXiv">
+  </a>
+  <img src="https://img.shields.io/badge/Python-3.10-blue.svg" alt="Python">
+  <a href="LICENSE">
+    <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License">
+  </a>
+</p>
+
+## Abstract
+
+- AMUSE combines the fast progress of Muon with the stability of Schedule-Free optimization using a time-varying Schedule-Free momentum.
+
+- From a river-valley perspective, Muon accelerates progress along flat bulk directions but can amplify oscillations along high-curvature dominant directions. AMUSE gradually moves gradient evaluation from the fast Muon trajectory toward a stable averaged trajectory, reducing oscillations while preserving rapid early progress.
+
+- Across vision tasks and language model pretraining, AMUSE improves the performance-iteration Pareto frontier over AdamW, Schedule-Free AdamW, and Muon.
+
+<details open>
+<summary><strong>Full paper abstract</strong></summary>
+
+Modern deep learning commonly relies on AdamW with prescribed learning rate schedules, but recent works challenge both components: Schedule-Free optimization removes explicit schedules via iterate averaging, and Muon improves the update geometry by orthogonalizing momentum for matrix parameters. Despite Muon's strong empirical performance, its underlying mechanism remains partially understood.
+We study Muon through the river-valley loss landscape, where useful training progress occurs along a flat, low-curvature bulk subspace, while high-curvature dominant directions form steep valley walls that induce oscillations. We empirically show that while Muon's orthogonalization accelerates river progress by increasing the bulk component, it also amplifies dominant-direction noise, causing oscillatory trajectories.
+Building on this, we propose **Anytime MUon with Stable gradient Evaluation (AMUSE)**, which integrates Muon's rapid bulk progress with the stabilizing effect of Schedule-Free averaging. AMUSE uses a time-varying interpolation coefficient that initially evaluates gradients near the fast Muon sequence for rapid adaptation, then gradually shifts toward the stable averaged sequence to suppress valley-wall oscillations. As a result, AMUSE requires no learning rate schedules and supports anytime training.
+Across vision tasks and large language model pretraining, AMUSE consistently improves the performance-iteration Pareto frontier over (Schedule-Free) AdamW and Muon.
+
+</details>
+
+
+## Repository Structure
+
+```text
+amuse/
+├── src/lm/       # language model pretraining experiments
+├── src/image/    # vision/image experiments
+├── src/optim/    # AMUSE and optimizer implementations
+├── scripts/      # launch scripts
+└── assets/       # figures and result plots
+```
+
+
+## Installation
 
 ```bash
 conda create -n amuse python=3.10
@@ -10,64 +58,60 @@ conda activate amuse
 pip install -r requirements.txt
 ```
 
-## Run AMUSE
+## Quick Start
 
-The main example in this repository is [`scripts/124m/amuse.sh`](scripts/124m/amuse.sh).
-It is the 124M AMUSE training run used on **FineWeb 100B**.
+### Large Language Model Pretraining
 
-Before running it, set your dataset path:
-
-```bash
-export DATASET_DIR=/path/to/datasets
-```
-
-Then launch:
+Run AMUSE on a 124M Llama-style model:
 
 ```bash
-bash scripts/124m/amuse.sh
+bash scripts/lm/124m/amuse.sh
 ```
 
-The current 124M example runs a 124M Llama-style model on **FineWeb 100B** with:
+Set `YOUR_DATASET_DIR` in the script to the root directory used by the FineWeb-100B loader.
 
-- `--opt amuse`
-- `--nproc_per_node=8`
-- `--dataset fineweb`
-- `--n_embd 768 --n_head 12 --n_layer 12`
-- `--batch_size 32 --acc_steps 8`
-
-In the code, `FineWeb 100B` is launched through the `fineweb` dataset path together with `--datasets_dir $DATASET_DIR`.
-
-You can also run the same FineWeb 100B setup directly:
-
+### Image Classification
+Run AMUSE on CIFAR-10:
 ```bash
-CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 torchrun --nproc_per_node=8 ./src/main.py \
-  --config_format base \
-  --model llama \
-  --distributed_backend nccl \
-  --n_embd 768 \
-  --n_head 12 \
-  --n_layer 12 \
-  --batch_size 32 \
-  --sequence_length 512 \
-  --acc_steps 8 \
-  --dataset fineweb \
-  --datasets_dir $DATASET_DIR \
-  --iterations 16000 \
-  --dropout 0.0 \
-  --warmup_steps 6000 \
-  --grad_clip 0.5 \
-  --seed 0 \
-  --opt amuse \
-  --lr 0.01 \
-  --weight_decay 0.05 \
-  --beta1 0.6 \
-  --rho 0.8 \
-  --beta2 0.999 \
-  --momentum 0.95 \
-  --scheduler none \
-  --eval_interval 115 \
-  --latest_ckpt_interval 0
+bash scripts/image/cifar10/amuse.sh
 ```
+
+Other image experiments are available in:
+```bash
+bash scripts/image/cifar100/amuse.sh
+bash scripts/image/svhn/amuse.sh
+bash scripts/image/imagenet/amuse.sh
+```
+
+For ImageNet, set `YOUR_DATASET_DIR` in the corresponding script.
+
+
+
+## Results
+
+### Language Model Pretraining
+
+AMUSE achieves the performance-iteration Pareto frontier in Llama-style pretraining on FineWeb-100B.
+
+<p align="center">
+  <img src="assets/fineweb_llama_124M.png" width="720" alt="FineWeb Llama 124M pretraining results">
+</p>
+
+<p align="center">
+  <em>FineWeb Llama 124M pretraining.</em>
+</p>
+
+The same trend holds across model scales.
+
+<p align="center">
+  <img src="assets/fineweb_llama_720m_1b.png" width="720" alt="FineWeb Llama scaling results for 720M and 1B models">
+</p>
+
+<p align="center">
+  <em>FineWeb Llama pretraining across 720M and 1B models.</em>
+</p>
+
+
 
 ## AMUSE Arguments
 
