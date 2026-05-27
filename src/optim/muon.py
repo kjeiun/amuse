@@ -123,6 +123,17 @@ def adjust_lr_wd_for_muon(lr, matched_adamw_rms, param_shape):
     return adjusted_lr
 
 
+@torch.no_grad()
+def muon_update(grad, momentum, beta=0.95, ns_steps=5, nesterov=True):
+    momentum.lerp_(grad, 1 - beta)
+    update = grad.lerp_(momentum, beta) if nesterov else momentum
+    if update.ndim == 4:
+        update = update.view(len(update), -1)
+    update = zeropower_via_newtonschulz5(update, steps=ns_steps)
+    update *= max(1, update.size(-2) / update.size(-1)) ** 0.5
+    return update
+
+
 # copy from https://github.com/KellerJordan/Muon/tree/master and support distributed solution
 class DistributedMuon(torch.optim.Optimizer):
     """
@@ -592,6 +603,74 @@ class Muon(torch.optim.Optimizer):
                 scale = bias_correction1 / bias_correction2**0.5
                 p.data.mul_(1 - lr * weight_decay)
                 p.data.add_(g, alpha=-lr / scale)
+
+
+class MuonWithAuxSGD(torch.optim.Optimizer):
+    def __init__(self, param_groups):
+        for group in param_groups:
+            assert "use_muon" in group
+            if group["use_muon"]:
+                group["params"] = sorted(
+                    group["params"], key=lambda x: x.size(), reverse=True
+                )
+                group["lr"] = group.get("lr", 0.02)
+                group["momentum"] = group.get("momentum", 0.95)
+                group["weight_decay"] = group.get("weight_decay", 0)
+            else:
+                group["lr"] = group.get("lr", 3e-4)
+                group["momentum"] = group.get("momentum", 0.0)
+                group["nesterov"] = group.get("nesterov", False)
+                group["weight_decay"] = group.get("weight_decay", 0)
+
+        super().__init__(param_groups, dict())
+
+    @torch.no_grad()
+    def step(self, closure=None):
+        loss = None
+        if closure is not None:
+            with torch.enable_grad():
+                loss = closure()
+
+        for group in self.param_groups:
+            lr = group["lr"]
+            if group["use_muon"]:
+                for p in group["params"]:
+                    if p.grad is None:
+                        continue
+                    state = self.state[p]
+                    if len(state) == 0:
+                        state["momentum_buffer"] = torch.zeros_like(p)
+
+                    update = muon_update(
+                        p.grad,
+                        state["momentum_buffer"],
+                        beta=group["momentum"],
+                    )
+                    p.mul_(1 - lr * group["weight_decay"])
+                    p.add_(update.reshape(p.shape), alpha=-lr)
+            else:
+                for p in group["params"]:
+                    if p.grad is None:
+                        continue
+
+                    grad = p.grad
+                    if group["weight_decay"] != 0:
+                        grad = grad.add(p, alpha=group["weight_decay"])
+
+                    state = self.state[p]
+                    if len(state) == 0:
+                        state["momentum_buffer"] = torch.zeros_like(p)
+
+                    buf = state["momentum_buffer"]
+                    buf.mul_(group["momentum"]).add_(grad)
+
+                    update = (
+                        grad.add(buf, alpha=group["momentum"])
+                        if group.get("nesterov", False)
+                        else buf
+                    )
+                    p.add_(update, alpha=-lr)
+        return loss
 
 
 def separate_params(param_groups):

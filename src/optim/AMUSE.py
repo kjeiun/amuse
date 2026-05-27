@@ -1,6 +1,9 @@
 import torch
 import torch.optim
 
+UPDATE_TYPES = {"muon", "adamw", "sgd"}
+AUX_UPDATE_TYPES = {"adamw", "sgd"}
+
 
 @torch.no_grad()
 def zeropower_via_newtonschulz5(
@@ -33,6 +36,7 @@ def muon_update(
     grad: torch.Tensor,
     momentum: torch.Tensor,
     beta: float = 0.95,
+    aux_update_type: str = "adamw",
     nesterov: bool = True,
 ) -> torch.Tensor:
     momentum.lerp_(grad, 1 - beta)
@@ -43,7 +47,18 @@ def muon_update(
 
     update = zeropower_via_newtonschulz5(update)
 
-    update *= 0.2 * max(update.size(0), update.size(1)) ** 0.5
+    if aux_update_type == "adamw":
+        # Scaling used in the AdamW-aux AMUSE setting.
+        update *= 0.2 * max(update.size(0), update.size(1)) ** 0.5
+    elif aux_update_type == "sgd":
+        # Muon default scaling used when auxiliary layers are trained by SGD.
+        update *= max(1, update.size(-2) / update.size(-1)) ** 0.5
+    else:
+        raise ValueError(
+            f"Invalid AMUSE aux_update_type: {aux_update_type}. "
+            "Expected one of {'adamw', 'sgd'}."
+        )
+
     return update
 
 
@@ -63,14 +78,18 @@ class AMUSE(torch.optim.Optimizer):
       Higher rho pushes beta1 toward 1 faster, so y moves closer to x
       faster. Lower rho keeps y farther from x for longer.
     - r: polynomial power for the z/x averaging weights.
-    - weight_decay: decoupled decay applied to z.
+    - weight_decay: decoupled decay applied to z for Muon and SGD paths.
     - weight_decay_at_y: optional decay applied while p is still y.
 
     Parameter groups:
     - Matrix hidden-layer weights should use {"use_muon": True}. These use
       Muon momentum and Newton-Schulz orthogonalization.
     - Embeddings, scalar parameters, and output head weights should use
-      {"use_muon": False}. These use the AdamW-style fallback.
+      {"use_muon": False}. By default these use the AdamW-style fallback.
+    - Non-Muon groups can set {"update_type": "sgd"} to use the same AMUSE
+      y/x/z schedule with a plain SGD z update instead of AdamW.
+    - Muon groups can set {"aux_update_type": "sgd"} to use Muon's default
+      scaling when the auxiliary layers are trained by SGD.
     - The AdamW-style fallback uses the group's beta2 value.
     - Each group should provide lr and weight_decay; Muon groups may also
       provide momentum.
@@ -104,12 +123,30 @@ class AMUSE(torch.optim.Optimizer):
             group.setdefault("weight_sum", 0.0)
             group.setdefault("use_muon", False)
             group.setdefault("weight_decay", 0.0)
-            group["base_lr"] = group.get("lr", 0.0)
             group.setdefault("beta1", self.beta1_init)
 
-            if group["use_muon"]:
+            update_type = (
+                "muon" if group["use_muon"] else group.get("update_type", "adamw")
+            )
+            if update_type not in UPDATE_TYPES:
+                raise ValueError(
+                    f"Invalid AMUSE update_type: {update_type}. "
+                    "Expected one of {'muon', 'adamw', 'sgd'}."
+                )
+            if update_type == "muon" and not group["use_muon"]:
+                raise ValueError('AMUSE update_type="muon" requires use_muon=True.')
+
+            group["update_type"] = update_type
+
+            if update_type == "muon":
                 group.setdefault("lr", 0.02)
                 group.setdefault("momentum", 0.95)
+                group.setdefault("aux_update_type", "adamw")
+                if group["aux_update_type"] not in AUX_UPDATE_TYPES:
+                    raise ValueError(
+                        f"Invalid AMUSE aux_update_type: {group['aux_update_type']}. "
+                        "Expected one of {'adamw', 'sgd'}."
+                    )
                 group["params"] = sorted(
                     group["params"], key=lambda x: x.size(), reverse=True
                 )
@@ -117,7 +154,7 @@ class AMUSE(torch.optim.Optimizer):
                     state = self.state[p]
                     if "momentum_buffer" not in state:
                         state["momentum_buffer"] = torch.zeros_like(p)
-            else:
+            elif update_type == "adamw":
                 group.setdefault("lr", 3e-4)
                 group.setdefault("beta2", 0.999)
                 group.setdefault("eps", 1e-10)
@@ -125,6 +162,10 @@ class AMUSE(torch.optim.Optimizer):
                     state = self.state[p]
                     if "exp_avg_sq" not in state:
                         state["exp_avg_sq"] = torch.zeros_like(p)
+            elif update_type == "sgd":
+                group.setdefault("lr", 1.0)
+
+            group["base_lr"] = group["lr"]
 
     def _compute_beta1(self, group, t, ckp1, warmup_steps):
         if t <= warmup_steps:
@@ -208,8 +249,11 @@ class AMUSE(torch.optim.Optimizer):
             wd = group.get("weight_decay", 0.0)
             self.beta1 = beta1
 
-            if group.get("use_muon", False):
+            update_type = group["update_type"]
+
+            if update_type == "muon":
                 beta_m = group["momentum"]
+                aux_update_type = group.get("aux_update_type", "adamw")
                 for p in group["params"]:
                     if p.grad is None:
                         continue
@@ -226,6 +270,7 @@ class AMUSE(torch.optim.Optimizer):
                         p.grad,
                         state["momentum_buffer"],
                         beta=beta_m,
+                        aux_update_type=aux_update_type,
                         nesterov=True,
                     )
                     if wd != 0.0:
@@ -233,13 +278,15 @@ class AMUSE(torch.optim.Optimizer):
                     z.add_(update.reshape(p.shape), alpha=-lr)
                     p.lerp_(end=z, weight=ckp1)
                     p.lerp_(end=z, weight=1.0 - beta1)
-            else:
+
+            elif update_type == "adamw":
                 beta2 = group.get("beta2", 0.999)
                 eps = group.get("eps", 1e-10)
                 bias_correction2 = 1.0 - beta2 ** t
                 for p in group["params"]:
                     if p.grad is None:
                         continue
+                    
                     state = self.state[p]
                     if "exp_avg_sq" not in state:
                         state["exp_avg_sq"] = torch.zeros_like(p)
@@ -247,17 +294,38 @@ class AMUSE(torch.optim.Optimizer):
                     z = self._get_z(p)
                     self._apply_weight_decay_at_y(p, z, lr, beta1)
 
+                    # y_t -> x_t, then update z, then rebuild y_{t+1}.
                     p.lerp_(end=z, weight=1.0 - 1.0 / beta1)
                     v = state["exp_avg_sq"]
                     grad = p.grad
                     v.mul_(beta2).addcmul_(grad, grad, value=1.0 - beta2)
                     denom = v.div(bias_correction2).sqrt_().add_(eps)
-                    update = grad.div_(denom)
+                    update = grad / denom
                     if wd != 0.0:
-                        update.add_(z, alpha=wd)
+                        update = update.add(z, alpha=wd)
                     z.add_(update, alpha=-lr)
                     p.lerp_(end=z, weight=ckp1)
                     p.lerp_(end=z, weight=1.0 - beta1)
+
+            elif update_type == "sgd":
+                for p in group["params"]:
+                    if p.grad is None:
+                        continue
+
+                    z = self._get_z(p)
+                    self._apply_weight_decay_at_y(p, z, lr, beta1)
+
+                    # y_t -> x_t, then update z, then rebuild y_{t+1}.
+                    p.lerp_(end=z, weight=1.0 - 1.0 / beta1)
+                    if wd != 0.0:
+                        z.mul_(1.0 - lr * wd)
+                    z.add_(p.grad, alpha=-lr)
+                    p.lerp_(end=z, weight=ckp1)
+                    p.lerp_(end=z, weight=1.0 - beta1)
+
+            else:
+                raise ValueError(f"Invalid AMUSE update_type: {update_type}")
+
             group["k"] = k + 1
 
         return loss

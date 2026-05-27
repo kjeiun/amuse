@@ -184,20 +184,6 @@ def save_checkpoint(model, opt, scheduler, itr, ckpt_dir: Path):
     ckpt_dir.mkdir(exist_ok=True, parents=True)
     torch.save(checkpoint, ckpt_dir / "main.pt")
 
-
-# def load_checkpoint(model, opt, scheduler, ckpt_path, device):
-#     if isinstance(model, torch.nn.parallel.DistributedDataParallel):
-#         model = model.module
-
-#     ckpt = torch.load(ckpt_path, map_location=device)
-#     model.load_state_dict(ckpt["model"])
-#     opt.load_state_dict(ckpt["optimizer"])
-#     if scheduler is not None:
-#         scheduler.load_state_dict(ckpt["scheduler"])
-#     itr = ckpt["itr"]
-#     return itr
-
-
 def load_checkpoint(
     model,
     opt,
@@ -261,14 +247,14 @@ def save_worker_state(ckpt_dir: Path):
     torch.save(worker_state, ckpt_dir / f"worker_{rank}.pt")
 
 
-def load_worker_state(ckpt_dir: Path):
-    rank = 0 if not dist.is_initialized() else dist.get_rank()
-    worker_state = torch.load(ckpt_dir / f"worker_{rank}.pt")
-    torch.random.set_rng_state(worker_state["rng_torch_cpu"])
-    torch.cuda.set_rng_state(worker_state["rng_torch_gpu"])
-    np.random.set_state(worker_state["rng_np"])
-    random.setstate(worker_state["rng_python"])
+def load_worker_state(ckpt_dir):
+    rank = torch.distributed.get_rank() if torch.distributed.is_initialized() else 0
 
+    worker_state = torch.load(
+        ckpt_dir / f"worker_{rank}.pt",
+        map_location="cpu",
+        weights_only=False,
+    )
 
 def get_parameter_norms(model, order=2):
     model_norm = 0
@@ -338,34 +324,3 @@ def visualize_routing(router_logits, extra_args):
         }
         logs.update(layer_token_routing)
     return logs
-    
-def save_schedulefree_xy_models(model, opt, itr, save_dir: Path):
-    if isinstance(model, torch.nn.parallel.DistributedDataParallel):
-        model = model.module
-
-    save_dir.mkdir(exist_ok=True, parents=True)
-
-    # Save y-weights (train-mode weights)
-    torch.save(
-        {
-            "model": model.state_dict(),
-            "itr": itr,
-            "optimizer": opt.state_dict(),
-            "mode": "y",
-        },
-        save_dir / f"model_y_iter{itr}.pt",
-    )
-
-    # Save x-weights (eval-mode weights)
-    opt.eval()
-    try:
-        torch.save(
-            {
-                "model": model.state_dict(),
-                "itr": itr,
-                "mode": "x",
-            },
-            save_dir / f"model_x_iter{itr}.pt",
-        )
-    finally:
-        opt.train()

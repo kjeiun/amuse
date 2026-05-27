@@ -48,12 +48,20 @@ def wsd_schedule(
         final_lr_factor: factor by which to reduce max_lr at the end
         warmup_fract: fraction of iterations used for warmup
         init_div_factor: initial division factor for warmup
-        fract_decay: fraction of iterations used for decay
+        fract_decay: fraction of iterations used for decay. Set to 0 to disable decay.
     Returns:
         schedule: a function that takes the current iteration and
         returns the multiplicative factor for the learning rate
     """
     n_anneal_steps = int(fract_decay * n_iterations)
+    if n_anneal_steps == 0:
+        def schedule(step):
+            if step < n_warmup:
+                return (step / n_warmup) + (1 - step / n_warmup) / init_div_factor
+            return 1.0
+
+        return schedule
+
     n_hold = n_iterations - n_anneal_steps
 
     def schedule(step):

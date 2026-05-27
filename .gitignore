@@ -209,25 +209,27 @@ marimo/_lsp/
 __marimo__/
 
 # Local benchmark/cache data
+# Local benchmark/cache data
 src/data/datasets/
+src/image/data/
 wandb/
-tb_logs
+tb_logs/
+assets/
+exps/
+sf_muon_results/
+
 src_0505/
 src_0505_96ver/
 src_0521/
 1.0B_logs_0504/
 1.0B_logs_0504.zip
-assets/
-exps/
-scripts/
-!scripts/
+
+# Ignore generated/old script dumps by default, but keep curated scripts
 scripts/*
-!scripts/124m/
-scripts/124m/*
-!scripts/124m/amuse.sh
-scripts/210m/
-scripts/moe-520m/
-sf_muon_results/
+!scripts/lm/
+!scripts/lm/**
+!scripts/image/
+!scripts/image/**
 
 kernel.py
 LISENSE
