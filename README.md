@@ -11,8 +11,8 @@
 
 <p align="center">
   <a href="https://arxiv.org/abs/2605.22432"><img src="https://img.shields.io/badge/arXiv-2605.22432-b31b1b.svg" alt="arXiv"></a>
+  <a href="#citation"><img src="https://img.shields.io/badge/BibTeX-Citation-orange.svg" alt="BibTeX"></a>
   <img src="https://img.shields.io/badge/Python-3.10-blue.svg" alt="Python">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License"></a>
 </p>
 
 ## Abstract
@@ -23,8 +23,7 @@
 
 - Across vision tasks and language model pretraining, AMUSE improves the performance-iteration Pareto frontier over AdamW, Schedule-Free AdamW, and Muon.
 
-> **Full paper abstract**
->
+**Full paper abstract**:
 > Modern deep learning commonly relies on AdamW with prescribed learning rate schedules, but recent works challenge both components: Schedule-Free optimization removes explicit schedules via iterate averaging, and Muon improves the update geometry by orthogonalizing momentum for matrix parameters. Despite Muon's strong empirical performance, its underlying mechanism remains partially understood.
 > We study Muon through the river-valley loss landscape, where useful training progress occurs along a flat, low-curvature bulk subspace, while high-curvature dominant directions form steep valley walls that induce oscillations. We empirically show that while Muon's orthogonalization accelerates river progress by increasing the bulk component, it also amplifies dominant-direction noise, causing oscillatory trajectories.
 > Building on this, we propose **Anytime MUon with Stable gradient Evaluation (AMUSE)**, which integrates Muon's rapid bulk progress with the stabilizing effect of Schedule-Free averaging. AMUSE uses a time-varying interpolation coefficient that initially evaluates gradients near the fast Muon sequence for rapid adaptation, then gradually shifts toward the stable averaged sequence to suppress valley-wall oscillations. As a result, AMUSE requires no learning rate schedules and supports anytime training.
@@ -53,9 +52,7 @@ pip install -r requirements.txt
 
 ## Quick Start
 
-### Language Model Pretraining
-
-Run AMUSE on a 124M Llama-style model:
+For language model pretraining, run AMUSE on a 124M Llama-style model with:
 
 ```bash
 bash scripts/lm/124m/amuse.sh
@@ -63,24 +60,21 @@ bash scripts/lm/124m/amuse.sh
 
 Set `YOUR_DATASET_DIR` in the script to the root directory used by the FineWeb-100B loader.
 
-See [`src/lm/README.md`](src/lm/README.md) for language-model-specific optimizer and parameter grouping details.
+For image classification, run AMUSE on CIFAR-10 with:
 
-### Image Classification
-Run AMUSE on CIFAR-10:
 ```bash
 bash scripts/image/cifar10/amuse.sh
 ```
 
-Other image experiments are available in:
+Other image experiments are available through:
+
 ```bash
 bash scripts/image/cifar100/amuse.sh
 bash scripts/image/svhn/amuse.sh
 bash scripts/image/imagenet/amuse.sh
 ```
 
-For ImageNet, set `YOUR_DATASET_DIR` in the corresponding script.
-
-See [`src/image/README.md`](src/image/README.md) for image-classification-specific optimizer and parameter grouping details.
+For ImageNet, set `YOUR_DATASET_DIR` in the corresponding script. See [`src/lm/README.md`](src/lm/README.md) and [`src/image/README.md`](src/image/README.md) for task-specific optimizer and parameter grouping details.
 
 
 
@@ -94,9 +88,6 @@ AMUSE achieves the performance-iteration Pareto frontier in Llama-style pretrain
   <img src="assets/fineweb_llama_124M.png" width="720" alt="FineWeb Llama 124M pretraining results">
 </p>
 
-<p align="center">
-  <em>FineWeb Llama 124M pretraining.</em>
-</p>
 
 The same trend holds across model scales.
 
@@ -104,26 +95,18 @@ The same trend holds across model scales.
   <img src="assets/fineweb_llama_720m_1b.png" width="720" alt="FineWeb Llama scaling results for 720M and 1B models">
 </p>
 
-<p align="center">
-  <em>FineWeb Llama pretraining across 720M and 1B models.</em>
-</p>
 
 ### Image Classification
+
+AMUSE also performs strongly across standard image classification benchmarks.
 
 <p align="center">
   <img src="assets/cifar_10_cifar100.png" width="720" alt="CIFAR-10 and CIFAR-100 image classification results">
 </p>
 
-<p align="center">
-  <em>CIFAR-10 and CIFAR-100 image classification.</em>
-</p>
 
 <p align="center">
   <img src="assets/svhn_imagenet.png" width="720" alt="SVHN and ImageNet image classification results">
-</p>
-
-<p align="center">
-  <em>SVHN and ImageNet image classification.</em>
 </p>
 
 
