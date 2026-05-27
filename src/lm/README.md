@@ -1,6 +1,6 @@
 # Language Model Pretraining
 
-This directory contains the language model pretraining code used for FineWeb-style Llama experiments.
+This directory contains the language model pretraining code used for FineWeb-100B Llama experiments.
 
 ## Quick Start
 
@@ -12,7 +12,7 @@ bash scripts/lm/124m/amuse.sh
 
 Run this command from the repository root.
 
-Set `YOUR_DATASET_DIR` in the script to the root directory used by the FineWeb loader.
+Set `YOUR_DATASET_DIR` in the script to the root directory used by the FineWeb-100B loader.
 
 ## AMUSE Arguments
 
@@ -50,12 +50,12 @@ Group 2: Adam-style fallback, `use_muon=False`
 - token embeddings such as `wte`
 - position embeddings such as `wpe` when present
 - scalar and vector parameters with `ndim < 2`
-- `lm_head.weight`
+- output projection `lm_head.weight`
 
 This group uses:
 
 - `lr`
-- `beta2`
+- `beta2` (`0.999` by default)
 - `eps=1e-10`
 - `update_type=args.amuse_aux_opt` (`adamw` by default)
 - `weight_decay`
@@ -65,8 +65,8 @@ This group uses:
 
 AMUSE follows the schedule-free style train/eval transition used in this codebase.
 
-- before optimizer steps, the optimizer is expected to be in train mode
-- during evaluation, the trainer switches AMUSE with `opt.eval()`
+- Before optimizer steps, the optimizer is expected to be in train mode with `opt.train()`
+- Before evaluation, the trainer switches AMUSE with `opt.eval()`
 
 ## Notes
 
