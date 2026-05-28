@@ -123,7 +123,7 @@ AMUSE achieves the performance-iteration Pareto frontier in Llama-style pretrain
 The same trend holds across model scales.
 
 <p align="center">
-  <img src="assets/fineweb_llama_720m_1b.png" width="720" alt="FineWeb Llama scaling results for 720M and 1B models">
+  <img src="assets/fineweb_llama_720m_13b.png" width="720" alt="FineWeb Llama scaling results for 720M and 1.3B models">
 </p>
 
 
