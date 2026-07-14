@@ -30,8 +30,8 @@ where the interpolation coefficient increases after warmup as
 $$
 \beta_t =
 \begin{cases}
-\beta_1, & t \le T_0, \\
-1 - \left(\frac{T_0 - 1}{t - 1}\right)^\rho (1-\beta_1), & t > T_0.
+\beta_{\mathrm{init}}, & t \le T_0, \\
+1 - \left(\frac{T_0}{t}\right)^\rho (1-\beta_{\mathrm{init}}), & t > T_0.
 \end{cases}
 $$
 
@@ -41,7 +41,7 @@ the fast Muon trajectory $Z_t$ toward the stable averaged trajectory $X_t$.
 For matrix-valued hidden parameters, AMUSE applies Muon at $Y_t$:
 
 $$
-M_t = \mu M_{t-1} + \nabla L(Y_t), \qquad
+M_t = \mu M_{t-1} + (1-\mu)\nabla L(Y_t), \qquad
 O_t = \mathrm{NewtonSchulz}(M_t),
 $$
 
