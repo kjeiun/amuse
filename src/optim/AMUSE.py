@@ -243,6 +243,9 @@ class AMUSE(torch.optim.Optimizer):
             group["ckp1"] = ckp1
             group["weight_sum"] = future_weight_sum
 
+            # p currently holds y built with the previous step's beta1, so
+            # y -> x must use that value, not the beta1 computed for this step.
+            y_beta1 = group.get("beta1", self.beta1_init)
             beta1 = self._compute_beta1(group, t, ckp1, warmup_steps)
             group["beta1"] = beta1
             group["r_t"] = ckp1 / ((1.0 - beta1) + beta1 * ckp1 + 1e-12)
@@ -262,10 +265,10 @@ class AMUSE(torch.optim.Optimizer):
                         state["momentum_buffer"] = torch.zeros_like(p)
 
                     z = self._get_z(p)
-                    self._apply_weight_decay_at_y(p, z, lr, beta1)
+                    self._apply_weight_decay_at_y(p, z, lr, y_beta1)
 
                     # y_t -> x_t, then update z, then rebuild y_{t+1}.
-                    p.lerp_(end=z, weight=1.0 - 1.0 / beta1)
+                    p.lerp_(end=z, weight=1.0 - 1.0 / y_beta1)
                     update = muon_update(
                         p.grad,
                         state["momentum_buffer"],
@@ -292,10 +295,10 @@ class AMUSE(torch.optim.Optimizer):
                         state["exp_avg_sq"] = torch.zeros_like(p)
 
                     z = self._get_z(p)
-                    self._apply_weight_decay_at_y(p, z, lr, beta1)
+                    self._apply_weight_decay_at_y(p, z, lr, y_beta1)
 
                     # y_t -> x_t, then update z, then rebuild y_{t+1}.
-                    p.lerp_(end=z, weight=1.0 - 1.0 / beta1)
+                    p.lerp_(end=z, weight=1.0 - 1.0 / y_beta1)
                     v = state["exp_avg_sq"]
                     grad = p.grad
                     v.mul_(beta2).addcmul_(grad, grad, value=1.0 - beta2)
@@ -313,10 +316,10 @@ class AMUSE(torch.optim.Optimizer):
                         continue
 
                     z = self._get_z(p)
-                    self._apply_weight_decay_at_y(p, z, lr, beta1)
+                    self._apply_weight_decay_at_y(p, z, lr, y_beta1)
 
                     # y_t -> x_t, then update z, then rebuild y_{t+1}.
-                    p.lerp_(end=z, weight=1.0 - 1.0 / beta1)
+                    p.lerp_(end=z, weight=1.0 - 1.0 / y_beta1)
                     if wd != 0.0:
                         z.mul_(1.0 - lr * wd)
                     z.add_(p.grad, alpha=-lr)
