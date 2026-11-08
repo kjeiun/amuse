@@ -114,7 +114,6 @@ class AMUSE(torch.optim.Optimizer):
         self.warmup_steps = int(warmup_steps)
         self.rho = float(rho)
         self.r = r
-        self.train_mode = False
 
         super().__init__(param_groups, defaults={})
         for group in self.param_groups:
@@ -123,6 +122,9 @@ class AMUSE(torch.optim.Optimizer):
             group.setdefault("weight_sum", 0.0)
             group.setdefault("use_muon", False)
             group.setdefault("weight_decay", 0.0)
+            # Stored per group (as in schedulefree.py) so that it is saved in
+            # state_dict() and restored on resume along with the y-form weights.
+            group.setdefault("train_mode", False)
             group.setdefault("beta1", self.beta1_init)
 
             update_type = (
@@ -189,6 +191,15 @@ class AMUSE(torch.optim.Optimizer):
             return
         z.sub_(p, alpha=lr * self.weight_decay_at_y)
         p.sub_(p, alpha=lr * self.weight_decay_at_y * (1.0 - beta1))
+
+    @property
+    def train_mode(self):
+        return self.param_groups[0].get("train_mode", False)
+
+    @train_mode.setter
+    def train_mode(self, value):
+        for group in self.param_groups:
+            group["train_mode"] = value
 
     @torch.no_grad()
     def eval(self):
